@@ -1,0 +1,38 @@
+[project]
+name = "divee-music-studio"
+version = "1.0.0"
+description = "All-in-one music production automation studio."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # GUI & Utilities
+    "customtkinter>=5.2.2",
+    "pillow>=12.0.0",
+    "packaging>=25.0",
+    "pyautogui>=0.9.54",
+    "pyperclip>=1.11.0",
+    "watchdog>=6.0.0",
+    "python-dotenv>=1.2.1",
+
+    # Audio Engine (Splitter)
+    "demucs>=4.0.1",
+    "librosa>=0.11.0",
+    "soundfile>=0.13.1",
+    "torch==2.3.1",
+    "torchaudio==2.3.1",
+    "numpy<2",
+    "pydub>=0.25.1",
+    "yt-dlp>=2025.11.12",
+
+    # Tab Automation (Tab Studio)
+    "playwright>=1.56.0",
+    "beautifulsoup4>=4.14.2",
+    "google-api-python-client>=2.187.0",
+    "google-auth-oauthlib>=1.2.3",
+    "requests>=2.32.5",
+    
+    # Build
+    "pyinstaller>=6.17.0",
+]
+
+# [tool.uv] セクションは削除してOK

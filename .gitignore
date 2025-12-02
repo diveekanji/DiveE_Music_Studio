@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Data
+DiveE_Exports/
+Output/
+temp_downloads/
+gp_processing_temp/
+
+# Secrets (絶対にコミットしないこと！)
+client_secrets.json
+songsterr_auth.json
+token_*.pickle
+
+# Config (個人設定は含めない場合)
+config.json
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# --- Binaries & Large Files (追加推奨) ---
+*.exe
+*.dll
+*.so
+*.dylib
+*.zip
+*.7z
+*.rar
+*.mp3
+*.wav
+*.mp4
+*.mid
+*.midi
