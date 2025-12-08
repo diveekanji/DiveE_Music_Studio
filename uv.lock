@@ -352,6 +352,7 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "soundfile" },
+    { name = "tkinterdnd2" },
     { name = "torch" },
     { name = "torchaudio" },
     { name = "watchdog" },
@@ -377,6 +378,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "soundfile", specifier = ">=0.13.1" },
+    { name = "tkinterdnd2", specifier = ">=0.4.3" },
     { name = "torch", specifier = "==2.3.1" },
     { name = "torchaudio", specifier = "==2.3.1" },
     { name = "watchdog", specifier = ">=6.0.0" },
@@ -1860,6 +1862,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tkinterdnd2"
+version = "0.4.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6e/2a/9d50ee58c7a60bf0c8d4bd8030b4afc29c8bf60158f95dbc89e8081d29d2/tkinterdnd2-0.4.3.tar.gz", hash = "sha256:03a932a11b42ab139c4552b414aa10ee8a087b8386b52baca8c62939760c2ef2", size = 444595, upload-time = "2025-02-28T12:55:50.861Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/c3/e04f004a53c00dc01126b6f998264cef672c6883c36aa4bd65845a8eb4c0/tkinterdnd2-0.4.3-py3-none-any.whl", hash = "sha256:8804f5d2e2a99713ec93e85384397fec6bf66fdf2065e3750938d55018971c4a", size = 493006, upload-time = "2025-02-28T12:55:47.501Z" },
+]
+
+[[package]]
 name = "torch"
 version = "2.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1939,7 +1950,7 @@ name = "triton"
 version = "2.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "filelock" },
+    { name = "filelock", marker = "python_full_version < '3.13'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/64/16/956b7b9d2ed3a437a1a06792b2ae2e3c49147296ba2f4d59fcee376ded8f/triton-2.3.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c9d64ae33bcb3a7a18081e3a746e8cf87ca8623ca13d2c362413ce7a486f893e", size = 168079264, upload-time = "2024-05-27T21:44:29.074Z" },

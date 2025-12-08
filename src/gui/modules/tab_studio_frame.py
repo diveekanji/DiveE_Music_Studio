@@ -13,8 +13,11 @@ from src.core.gmail import GmailClient
 from src.core.gp_manager import GPManager
 from src.automation.tux_printer import TuxGuitarPrinter
 
+# New: Local Transcriber
+from src.audio.transcriber import AudioTranscriber
+
 # Shared UI
-from src.gui.shared import COLORS, ModernCard, PrimaryButton, SecondaryButton, ModernEntry
+from src.gui.shared import COLORS, ModernCard, PrimaryButton, SecondaryButton, ModernEntry, StatusBadge
 
 class TabStudioFrame(ctk.CTkFrame):
     def __init__(self, parent, config_manager):
@@ -55,7 +58,7 @@ class TabStudioFrame(ctk.CTkFrame):
         self.btn_select_gp.pack(fill="x", pady=5)
 
         # 2. Online Generation (Songsterr)
-        self.card_online = ModernCard(self.left_panel, title="2. Tab Generation")
+        self.card_online = ModernCard(self.left_panel, title="2. Online Gen (Songsterr)")
         self.card_online.grid(row=2, column=0, padx=15, pady=10, sticky="ew")
 
         self.entry_artist = ModernEntry(self.card_online.inner_frame, placeholder="Artist Name")
@@ -65,8 +68,18 @@ class TabStudioFrame(ctk.CTkFrame):
         self.entry_manual_url = ModernEntry(self.card_online.inner_frame, placeholder="YouTube / Songsterr URL")
         self.entry_manual_url.pack(fill="x", pady=5)
 
-        self.btn_start = PrimaryButton(self.left_panel, text="GENERATE TABS", command=self.start_process, color="success")
+        self.btn_start = PrimaryButton(self.left_panel, text="GENERATE TABS (ONLINE)", command=self.start_process, color="success")
         self.btn_start.grid(row=3, column=0, padx=15, pady=(10, 20), sticky="ew")
+
+        # 3. Local Generation (Beta) - NEW!
+        self.card_local = ModernCard(self.left_panel, title="3. Local Gen (Beta)")
+        self.card_local.grid(row=4, column=0, padx=15, pady=10, sticky="ew")
+        
+        ctk.CTkLabel(self.card_local.inner_frame, text="Converts Audio to MIDI directly.\nBest for Bass lines.", 
+                     font=("Arial", 11), text_color="gray").pack(pady=(0, 5))
+
+        self.btn_local_gen = SecondaryButton(self.card_local.inner_frame, text="Audio to MIDI (Local)", command=self.start_local_gen)
+        self.btn_local_gen.pack(fill="x", pady=5)
 
 
         # === Right Panel (Tracks & Log) ===
@@ -194,7 +207,7 @@ class TabStudioFrame(ctk.CTkFrame):
                     except Exception as e:
                         if "uploadLimitExceeded" in str(e):
                             self.log("[Error] Upload limit reached. Use manual URL.")
-                            self.after(0, lambda: self.btn_start.configure(state="normal", text="GENERATE TABS"))
+                            self.after(0, lambda: self.btn_start.configure(state="normal", text="GENERATE TABS (ONLINE)"))
                             return
                         else:
                             raise e
@@ -229,8 +242,51 @@ class TabStudioFrame(ctk.CTkFrame):
         except Exception as e:
             self.log(f"Error: {e}")
             traceback.print_exc()
-            self.after(0, lambda: self.btn_start.configure(state="normal", text="GENERATE TABS"))
+            self.after(0, lambda: self.btn_start.configure(state="normal", text="GENERATE TABS (ONLINE)"))
 
+    # --- Local Generation Logic ---
+    def start_local_gen(self):
+        if not self.audio_path:
+            messagebox.showwarning("Info", "Please select an Audio File first.")
+            return
+        
+        self.btn_local_gen.configure(state="disabled", text="Processing...")
+        self.log("Starting LOCAL generation...", clear=True)
+        
+        threading.Thread(target=self.run_local_gen_flow, args=(self.audio_path,), daemon=True).start()
+
+    def run_local_gen_flow(self, audio_path):
+        try:
+            self.log("Mode: Local AI (Basic Pitch)")
+            
+            # MIDI生成
+            midi_path = AudioTranscriber.audio_to_midi(
+                audio_path, 
+                str(self.OUTPUT_DIR), 
+                log_callback=self.log
+            )
+            
+            self.log(f"MIDI Generated: {os.path.basename(midi_path)}")
+            self.log("Opening in TuxGuitar (Manual Import needed)...")
+            
+            # TuxGuitarを開く
+            tux_path = self.config.get("tux_path")
+            if os.path.exists(tux_path):
+                # MIDIファイルをTuxGuitarで開く (インポートダイアログが出るはず)
+                os.system(f'"{tux_path}" "{midi_path}"')
+                self.log("TuxGuitar launched.")
+            else:
+                self.log("TuxGuitar not found. Please open the MIDI file manually.")
+            
+            self.after(0, lambda: messagebox.showinfo("Done", f"MIDI file created:\n{midi_path}"))
+            
+        except Exception as e:
+            self.log(f"Local Gen Error: {e}")
+            traceback.print_exc()
+        finally:
+            self.after(0, lambda: self.btn_local_gen.configure(state="normal", text="Audio to MIDI (Local)"))
+
+    # --- Shared UI Logic ---
     def update_track_ui(self):
         for widget in self.track_frame.winfo_children():
             widget.destroy()
@@ -254,7 +310,7 @@ class TabStudioFrame(ctk.CTkFrame):
             self.track_checkboxes.append({"index": track['index'], "var": var, "name": track['new_name']})
 
         self.btn_print.configure(state="normal")
-        self.btn_start.configure(state="normal", text="GENERATE TABS")
+        self.btn_start.configure(state="normal", text="GENERATE TABS (ONLINE)")
 
     def start_printing(self):
         self.btn_print.configure(state="disabled")

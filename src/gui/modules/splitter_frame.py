@@ -6,7 +6,7 @@ import customtkinter as ctk
 import yt_dlp
 from pydub import AudioSegment
 
-from src.gui.shared import COLORS, ModernCard, PrimaryButton, SecondaryButton, ModernEntry, DummyFile, StatusBadge
+from src.gui.shared import COLORS, FONTS, ModernCard, PrimaryButton, SecondaryButton, ModernEntry, DummyFile, StatusBadge
 from src.core.downloader import AudioDownloader
 
 class StemSplitterFrame(ctk.CTkFrame):
@@ -20,77 +20,82 @@ class StemSplitterFrame(ctk.CTkFrame):
 
         self.target_file_path = None  
         self.result_stem_dir = None   
-        self.stems_vars = {}          
+        self.stems_vars = {} 
 
         # === Left Panel (Controls) ===
-        self.left_panel = ctk.CTkFrame(self, width=300, corner_radius=10, fg_color=COLORS["card_bg"])
-        self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 15))
+        self.left_panel = ctk.CTkFrame(self, width=320, corner_radius=0, fg_color="transparent") # パネル自体の背景は透明に
+        self.left_panel.grid(row=0, column=0, sticky="nsew", padx=(0, 20))
         self.left_panel.grid_columnconfigure(0, weight=1)
 
         # Header
-        ctk.CTkLabel(self.left_panel, text="AI SPLITTER", font=("Roboto Medium", 20), text_color=COLORS["text_main"]).grid(row=0, column=0, pady=(25, 10))
+        ctk.CTkLabel(self.left_panel, text="Stem Splitter", font=FONTS["h1"], text_color=COLORS["text_main"]).grid(row=0, column=0, sticky="w", pady=(0, 20))
 
         # 1. Input Source Card
         self.card_input = ModernCard(self.left_panel, title="Input Source")
-        self.card_input.grid(row=1, column=0, padx=15, pady=10, sticky="ew")
+        self.card_input.grid(row=1, column=0, sticky="ew", pady=(0, 20))
         
-        self.tab_view = ctk.CTkTabview(self.card_input.inner_frame, height=140, 
-                                       fg_color="transparent", segmented_button_fg_color=COLORS["input_bg"],
-                                       segmented_button_selected_color=COLORS["accent"])
+        self.tab_view = ctk.CTkTabview(self.card_input.inner_frame, height=150, 
+                                       fg_color="transparent", 
+                                       segmented_button_fg_color=COLORS["input_bg"],
+                                       segmented_button_selected_color=COLORS["accent"],
+                                       segmented_button_unselected_color=COLORS["input_bg"],
+                                       text_color=COLORS["text_sub"])
         self.tab_view.pack(fill="x", pady=(0, 10))
         
         self.tab_yt = self.tab_view.add("YouTube")
         self.tab_local = self.tab_view.add("Local File")
 
         # YouTube Tab
-        self.entry_url = ModernEntry(self.tab_yt, placeholder="Paste YouTube URL...")
+        self.entry_url = ModernEntry(self.tab_yt, placeholder="Paste YouTube URL here...")
         self.entry_url.pack(fill="x", pady=15, padx=5)
         
         # Local Tab
-        self.btn_browse = SecondaryButton(self.tab_local, text="Choose File", command=self.select_local_file)
+        self.btn_browse = SecondaryButton(self.tab_local, text="Select Audio File", command=self.select_local_file)
         self.btn_browse.pack(fill="x", pady=(15, 5), padx=5)
         
-        self.lbl_local_filename = ctk.CTkLabel(self.tab_local, text="No file selected", text_color="gray", font=("Arial", 11))
+        self.lbl_local_filename = ctk.CTkLabel(self.tab_local, text="No file selected", text_color=COLORS["text_dim"], font=FONTS["small"])
         self.lbl_local_filename.pack()
 
         # 2. Actions
         self.btn_start = PrimaryButton(self.left_panel, text="START SEPARATION", command=self.start_process, color="success")
-        self.btn_start.grid(row=2, column=0, padx=15, pady=20, sticky="ew")
+        self.btn_start.grid(row=2, column=0, sticky="ew", pady=10)
         
         # === Right Panel (Mixer) ===
         self.right_panel = ctk.CTkFrame(self, fg_color="transparent")
         self.right_panel.grid(row=0, column=1, sticky="nsew")
-        self.right_panel.grid_rowconfigure(0, weight=1)
+        self.right_panel.grid_rowconfigure(1, weight=1)
         self.right_panel.grid_columnconfigure(0, weight=1)
+        
+        # Header Right
+        ctk.CTkLabel(self.right_panel, text="Mixer & Export", font=FONTS["h1"], text_color=COLORS["text_main"]).grid(row=0, column=0, sticky="w", pady=(0, 20))
 
         # Mixer Card
-        self.mixer_card = ModernCard(self.right_panel, title="MIXER & STEMS")
-        self.mixer_card.grid(row=0, column=0, sticky="nsew")
+        self.mixer_card = ModernCard(self.right_panel, title="Stems")
+        self.mixer_card.grid(row=1, column=0, sticky="nsew")
+        
         self.mixer_card.inner_frame.grid_rowconfigure(0, weight=1) 
         self.mixer_card.inner_frame.grid_columnconfigure(0, weight=1)
 
         self.mixer_scroll = ctk.CTkScrollableFrame(self.mixer_card.inner_frame, fg_color="transparent", label_text="")
-        self.mixer_scroll.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        self.mixer_scroll.grid(row=0, column=0, sticky="nsew", padx=0, pady=5)
         
-        self.mixer_placeholder = ctk.CTkLabel(self.mixer_scroll, text="Process audio to see stems here.", text_color="gray", font=("Arial", 14))
-        self.mixer_placeholder.pack(pady=80)
+        self.mixer_placeholder = ctk.CTkLabel(self.mixer_scroll, text="Process audio to reveal stems.", text_color=COLORS["text_dim"], font=FONTS["h3"])
+        self.mixer_placeholder.pack(pady=100)
 
         # Mixer Controls
         self.mixer_controls = ctk.CTkFrame(self.mixer_card.inner_frame, fg_color="transparent")
-        self.mixer_controls.grid(row=1, column=0, sticky="ew", pady=10)
+        self.mixer_controls.grid(row=2, column=0, sticky="ew", pady=(15, 0))
         
         self.btn_export_mix = PrimaryButton(self.mixer_controls, text="Export Mix (mp3)", command=self.start_mix_export, color="accent")
         self.btn_export_mix.pack(side="left", fill="x", expand=True, padx=(0, 10))
         self.btn_export_mix.configure(state="disabled")
         
-        # ▼▼▼ 修正: widthをコンストラクタ引数に移動 ▼▼▼
-        self.btn_open_folder = SecondaryButton(self.mixer_controls, text="Open Folder", command=self.open_output_folder, width=100)
+        self.btn_open_folder = SecondaryButton(self.mixer_controls, text="Open Folder", command=self.open_output_folder, width=120)
         self.btn_open_folder.pack(side="right")
-        # ▲▲▲ 修正終了 ▲▲▲
 
         # Status Bar
         self.status_bar = ctk.CTkFrame(self.right_panel, height=30, fg_color="transparent")
-        self.status_bar.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        self.status_bar.grid(row=3, column=0, sticky="ew", pady=(10, 0))
         
         self.lbl_status = StatusBadge(self.status_bar, text="Ready", status="neutral")
         self.lbl_status.pack(side="left")
@@ -106,7 +111,7 @@ class StemSplitterFrame(ctk.CTkFrame):
         path = filedialog.askopenfilename(filetypes=[("Audio Files", "*.mp3 *.wav *.m4a *.flac")])
         if path:
             self.target_file_path = path
-            self.lbl_local_filename.configure(text=os.path.basename(path), text_color=COLORS["text_main"])
+            self.lbl_local_filename.configure(text=os.path.basename(path), text_color=COLORS["accent"])
             self.log(f"Selected: {os.path.basename(path)}")
 
     def open_output_folder(self):
@@ -125,7 +130,7 @@ class StemSplitterFrame(ctk.CTkFrame):
             messagebox.showwarning("Error", "Select a file.")
             return
 
-        self.btn_start.configure(state="disabled", text="Processing...")
+        self.btn_start.configure(state="disabled", text="PROCESSING...", fg_color=COLORS["text_dim"])
         self.log("Starting process...")
         
         threading.Thread(target=self.run_separation_flow, args=(mode, target), daemon=True).start()
@@ -142,7 +147,6 @@ class StemSplitterFrame(ctk.CTkFrame):
             if mode == "youtube":
                 self.log(f"Downloading from YouTube...")
                 try:
-                    # 共通ダウンローダーを使用
                     audio_path = AudioDownloader.download(target, output_dir, log_callback=self.log)
                 except Exception as e:
                     raise RuntimeError(f"Download failed: {e}")
@@ -153,7 +157,6 @@ class StemSplitterFrame(ctk.CTkFrame):
             # 2. Separate
             self.log(f"Separating Stems with AI ({model})...")
             import sys
-            # Noconsole対策
             original_stdout = sys.stdout
             original_stderr = sys.stderr
             sys.stdout = DummyFile()
@@ -180,7 +183,7 @@ class StemSplitterFrame(ctk.CTkFrame):
             self.log(f"Error: {e}")
             self.after(0, lambda: messagebox.showerror("Error", str(e)))
         finally:
-            self.after(0, lambda: self.btn_start.configure(state="normal", text="START SEPARATION"))
+            self.after(0, lambda: self.btn_start.configure(state="normal", text="START SEPARATION", fg_color=COLORS["success"]))
             
     def setup_mixer_ui(self):
         for widget in self.mixer_scroll.winfo_children(): widget.destroy()
@@ -190,20 +193,31 @@ class StemSplitterFrame(ctk.CTkFrame):
         stems = [f for f in os.listdir(self.result_stem_dir) if f.endswith(".wav")]
         for stem in stems:
             stem_name = os.path.splitext(stem)[0]
+            # Color coding stems
             color = COLORS["text_main"]
-            if "guitar" in stem_name: color = "#E67E22"
-            elif "piano" in stem_name: color = "#9B59B6"
-            elif "bass" in stem_name: color = "#3498DB"
-            elif "drum" in stem_name: color = "#E74C3C"
-            elif "vocal" in stem_name: color = "#F1C40F"
+            if "guitar" in stem_name: color = "#f97316" # Orange
+            elif "piano" in stem_name: color = "#a855f7" # Purple
+            elif "bass" in stem_name: color = "#3b82f6" # Blue
+            elif "drum" in stem_name: color = "#ef4444" # Red
+            elif "vocal" in stem_name: color = "#eab308" # Yellow
             
             var = ctk.BooleanVar(value=True)
-            row_f = ctk.CTkFrame(self.mixer_scroll, fg_color="transparent")
-            row_f.pack(fill="x", pady=5)
             
-            chk = ctk.CTkCheckBox(row_f, text=stem_name.upper(), variable=var, text_color=color, 
-                                  font=("Arial", 14, "bold"), fg_color=COLORS["accent"], hover_color=COLORS["accent_hover"], width=24, height=24)
-            chk.pack(side="left", padx=10)
+            # Row container
+            row_f = ctk.CTkFrame(self.mixer_scroll, fg_color=COLORS["input_bg"], corner_radius=8)
+            row_f.pack(fill="x", pady=4, padx=5)
+            
+            chk = ctk.CTkCheckBox(row_f, text=stem_name.upper(), variable=var, text_color="white", 
+                                  font=(FONTS["body_bold"]), fg_color=color, hover_color=color, 
+                                  border_width=2, border_color=COLORS["input_border"],
+                                  width=24, height=24)
+            chk.pack(side="left", padx=15, pady=10)
+            
+            # Volume bar placeholder (Visual only for now)
+            # vol_bar = ctk.CTkProgressBar(row_f, height=6, progress_color=color)
+            # vol_bar.set(0.8)
+            # vol_bar.pack(side="left", fill="x", expand=True, padx=20)
+
             self.stems_vars[stem_name] = var
 
         self.btn_export_mix.configure(state="normal")
