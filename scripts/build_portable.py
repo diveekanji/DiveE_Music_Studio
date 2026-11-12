@@ -42,6 +42,12 @@ def build(python_home, site_packages, destination, resume=False):
     ignore = shutil.ignore_patterns("__pycache__", "*.pyc")
     shutil.copytree(python_home, destination / "runtime", dirs_exist_ok=True, ignore=ignore, copy_function=copy_file)
     shutil.copytree(site_packages, destination / "runtime" / "Lib" / "site-packages", dirs_exist_ok=True, ignore=ignore, copy_function=copy_file)
+    # Windows wheels (MKL/OpenMP/TBB) install native DLLs outside site-packages.
+    environment = site_packages.parents[1]
+    for name in ("Library", "share"):
+        if (environment / name).is_dir():
+            shutil.copytree(environment / name, destination / "runtime" / name,
+                            dirs_exist_ok=True, ignore=ignore, copy_function=copy_file)
     (destination / "Start_DiveE.cmd").write_text(
         '@echo off\ncd /d "%~dp0"\nstart "" "%~dp0runtime\\pythonw.exe" "%~dp0app\\launch.py"\n',
         encoding="ascii")
@@ -64,3 +70,4 @@ if __name__ == "__main__":
     parser.add_argument("--resume", action="store_true", help="Resume a previously interrupted assembly of the same package")
     args = parser.parse_args()
     build(args.python_home.resolve(), args.site_packages.resolve(), args.destination.resolve(), args.resume)
+
