@@ -85,10 +85,10 @@ class SplitterFrame(ctk.CTkFrame):
         # 設定
         SectionHeader(self.left_panel, text="Separation Settings").pack(pady=(10, 10), padx=20, anchor="w")
 
-        self.model_var = ctk.StringVar(value="htdemucs (Standard)")
+        self.model_var = ctk.StringVar(value="htdemucs (Bundled / Offline)")
         self.model_combo = ctk.CTkOptionMenu(
             self.left_panel,
-            values=["htdemucs (Standard)", "htdemucs_ft (Fine-tuned)", "mdx_extra (High Quality)"],
+            values=["htdemucs (Bundled / Offline)"],
             variable=self.model_var,
             font=AppFonts.body(),
             fg_color=AppColors.BG_ROOT,
@@ -201,7 +201,7 @@ class SplitterFrame(ctk.CTkFrame):
         self.status_badge.update_status("RUNNING", "warning")
         self.progress_bar.configure(mode="indeterminate")
         self.progress_bar.start()
-        self.log("Separating audio. First use downloads model weights; CUDA falls back to CPU when unavailable.")
+        self.log("Separating with the bundled model (no download). CUDA falls back to CPU when unavailable.")
         threading.Thread(target=self._run_demucs_task,
                          args=(source, model, use_gpu), daemon=True).start()
 

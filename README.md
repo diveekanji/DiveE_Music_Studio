@@ -1,72 +1,94 @@
 # DiveE Music Studio
 
-音源分離と音声ダウンロードのデスクトップアプリです。現在は開発版で、表示されるすべての機能が完成しているわけではありません。
+音源分離と音声ダウンロードの Windows デスクトップアプリです。開発版のため、未実装機能は画面上で無効化しています。
+
+## 同梱版の起動
+
+`DiveE_Music_Studio_Portable/Start_DiveE.cmd` をダブルクリックしてください。
+Python、FFmpeg、ffprobe、標準の音源分離モデル htdemucs を含みます。インストール、PATH 設定、初回のモデルダウンロードは不要です。
+フォルダ全体を一緒に移動できます。`runtime` と `app/vendor` を削除しないでください。
+
+AI Splitter で音声を1件選び、START SEPARATION を押します。標準モデルで drums / bass / other / vocals の4種類に分離します。初回からオフラインで使えます。CPU での処理には時間がかかります。
+YouTube ダウンロードのみインターネット接続が必要です。
 
 ## 対応状況
 
 | 機能 | 状態 | 備考 |
 | --- | --- | --- |
-| AI Splitter | 実装済み | Demucs 4.0.1 で drums / bass / other / vocals を WAV 保存。4ファイルを読み取り確認してから完了表示 |
-| YouTube → MP3 | 実装済み・外部サービス依存 | yt-dlp + FFmpeg。変換後のファイルが存在する場合のみ成功表示。サイト変更・認証・通信状態によって失敗する場合あり |
+| AI Splitter | 実装済み | Demucs 4.0.1 + 同梱 htdemucs。4ファイルを読み取り確認してから完了表示 |
+| YouTube → MP3 | 実装済み・外部サービス依存 | yt-dlp と同梱 FFmpeg を使用。変換済みファイルの存在確認後に成功表示 |
 | Tab Studio | 未接続・操作無効 | 採譜、URL 取り込み、TuxGuitar 起動は実行しません |
-| Format Converter / BPM・Key | 未実装・操作無効 | コアの試作処理はありますが画面からは使えません |
-| Settings | 一部実装 | 保存先表示、データフォルダを開く、テーマ変更。キャッシュ削除は無効。テーマの永続保存なし |
+| Format Converter / BPM・Key | 未実装・操作無効 | コアの試作処理は画面に未接続 |
+| Settings | 一部実装 | 同梱ファイル・保存先表示、フォルダを開く、テーマ変更。テーマの永続保存とキャッシュ削除は未実装 |
 
-## 必要な環境
+対応基準は Windows x64 / Python 3.11 です。同梱版は Python 3.11.18、FFmpeg 9.0.2 を使用します。
+CUDA が利用できない場合は CPU を使用します。GPU 用 Torch 構成、macOS / Linux、インストーラーは未検証です。
+同梱版は Python 実行環境を含むフォルダ形式で、単一の exe ではありません。
 
-- 対応基準: Windows x64、Python **3.11**、デスクトップ画面が使える環境。
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) をインストールしてください。
-- [FFmpeg](https://ffmpeg.org/download.html) の Windows ビルドを展開し、`ffmpeg.exe` と `ffprobe.exe` がある `bin` を PATH に追加してください。
-- GPU は必須ではありません。CUDA が利用できない場合は CPU を使用します。GPU 用の Torch 構成はこのリリースの検証対象外です。
-- 初回の依存関係取得とモデルダウンロードにはネット接続・空きディスク容量が必要です。CPU での分離には時間がかかります。
-- macOS / Linux と実行ファイル配布は未検証です。PyInstaller は依存関係にありますが、ビルド仕様・配布物はまだ提供していません。
+## 保存先とログ
 
-## 起動（PowerShell）
+- 同梱版の分離結果: `app/data/outputs/splitter/separation-<一意のID>/htdemucs/<曲名>/`
+- 同梱版のダウンロード: `app/data/outputs/downloads/`
+- 同梱版の起動ログ: `app/data/logs/application.log`
+- ソースから起動する場合は `app/` を除いた同じ相対パスです。
+
+同名曲の分離を再実行しても、前回の結果は上書きしません。失敗した実行の部分出力は削除します。
+処理のキャンセルは未実装です。完了までアプリを終了しないでください。
+
+## ソースから起動（開発者向け）
+
+リポジトリには大きなバイナリをコミットせず、固定 URL と SHA-256 を使う準備スクリプトを管理しています。同梱フォルダには取得済みの実ファイルを含めます。
 
 ```powershell
 git clone https://github.com/diveekanji/DiveE_Music_Studio.git
 cd DiveE_Music_Studio
+# PR の変更を使う場合
+git switch codex/stabilize-music-studio
 uv python install 3.11
 uv sync --locked
-ffmpeg -version
-ffprobe -version
+uv run --locked python scripts/prepare_runtime.py
 uv run --locked python main.py
 ```
 
-`uv.lock` は再現可能な環境構築のために管理しています。Python 3.12 以降は現在の対応範囲に含めていません。
-Windows で依存パッケージの構築中に長いパスのエラーが発生する場合は、リポジトリと `UV_CACHE_DIR` を短いパスに配置して再試行してください。
+[uv の導入手順](https://docs.astral.sh/uv/getting-started/installation/)。準備スクリプトは Windows 標準の `tar.exe` を使用します。
+Windows で長いパスによるパッケージ構築エラーが起きる場合は、リポジトリと `UV_CACHE_DIR` を短いパスに配置してください。
 
-## 操作と保存先
-
-AI Splitter で音声を1件選び、モデルを選択して START SEPARATION を押します。GPU の選択を外すと CPU に固定できます。
-標準モデルは `htdemucs` です。未導入の DiffQ を必要とする `mdx_extra_q` は選択肢から外し、`mdx_extra` を使用します。
-結果は `data/outputs/splitter/separation-<一意のID>/<モデル名>/<曲名>/` に保存されます。同名の曲を再実行しても前回の結果を上書きしません。失敗した実行の部分的な出力は削除します。
-
-Tools に YouTube URL を入力すると `data/outputs/downloads/` に MP3 を保存します。曲名に動画 ID を含め、異なる動画の同名衝突を抑えています。
-処理中のキャンセルは未実装です。分離やダウンロードが完了するまでアプリを終了しないでください。
-
-開発時のデータはリポジトリ内の `data/` にあります。モデル重みは Demucs / Torch 標準のキャッシュを使います。Settings の Models Path はアプリ側の予約領域で、Demucs のダウンロード先ではありません。
-PyInstaller 用のパス分岐は `src/core/config_manager.py` にありますが、配布ビルドの動作保証を意味しません。
+FFmpeg の配布アーカイブとモデルの SHA-256 を検証してから `vendor/` に配置します。モデルは公式配布元が失敗した場合、コミットを固定したミラーから取得し、同じ完全な SHA-256 を照合します。TLS 証明書の検証は無効化しません。
+分離処理は `--repo` で同梱モデルを指定するため、実行時にリモート配布元へアクセスしません。同梱モデルが欠落・破損した場合は、ネット取得へ切り替えずエラーを表示します。
+標準 htdemucs のみ対応します。追加モデルはこの同梱版の選択肢に含めていません。
 
 ## 検証
 
 ```powershell
 uv run --locked python -m unittest discover -s tests -v
 uv run --locked python -m demucs.separate --help
-# 実モデルを取得して短い合成音声を CPU で分離する任意の統合テスト
+# 同梱ファイルの準備後、実モデルで WAV と MP3 を分離
 uv run --locked python -m tests.integration_separation
 ```
 
-通常テストは GUI の生成、失敗時の操作復帰、CLI 引数、4つの出力の検証、欠落出力・外部プロセス失敗・FFmpeg 不在、ダウンロード成果物の確認を扱います。外部処理はモック化し、通常テストではモデル取得や YouTube 接続を行いません。実推論は上記の統合テストで別途確認します。
-GitHub Actions は Windows で通常テストと Demucs CLI の読み込みを実行します。
+通常テストは GUI 起動と失敗時復帰、CLI 引数、成果物、FFmpeg 不在、同梱優先と環境変数の非破壊、モデル破損・欠落を検証します。
+実分離の統合テストは、システム PATH を空にし、ネット接続を使えないプロキシ設定で実行します。同梱 FFmpeg による MP3 変換と、WAV / MP3 からそれぞれ4種類の読み取り可能なステレオ WAV が出ることを確認します。これは音楽的な分離品質を評価するテストではありません。
+GitHub Actions は Windows で通常テストと Demucs CLI の読み込みを実行します。実モデルの統合テストは任意実行です。
 
-今回のローカル検証では Windows / Python 3.11 で依存関係の導入、8件の通常テスト、Demucs CLI の読み込みが成功しました。実モデルの統合テストは、重みの配布元 `dl.fbaipublicfiles.com` の証明書期限切れによってダウンロード段階で停止しています。実推論、実際の YouTube ダウンロード、GPU は未検証です。証明書の検証を無効化せず、配布元の復旧後に統合テストを実行してください。
+2026-11-12 のローカル検証で、12件の通常テストと、同梱モデルによる WAV / MP3 の実分離が成功しました。実際の YouTube ダウンロードと GPU 実行は未検証です。
 
-## ソースと今後の作業
+## 同梱フォルダの再構築
 
-- `main.py` → `src/gui/modules/{splitter,tab_studio,tools,settings}.py` が正規の画面です。重複していた `*_frame.py` は削除しました。以前の実装は Git 履歴から参照できます。
-- `src/audio/separator.py` は Demucs CLI との接続と成果物検証を担当します。重いモデルを画面起動時に読み込みません。
-- `src/audio/transcriber.py`、Songsterr / Gmail / YouTube アップロード / TuxGuitar 関連は未接続の試作コードです。採譜の `basic_pitch` は現行依存関係に含まず、起動時にも読み込みません。有効化前に互換性のある依存構成と統合テストを追加してください。
-- `DiveE_Source_Code.txt` は過去のソース書き出しで、現行ソースの正本ではありません。変更・レビューには個別の `.py` を使用してください。
+準備済み `vendor/`、Python standalone の展開先、`uv sync --locked` 済み環境を渡します。
 
-次の開発候補は、採譜機能の依存関係を分離して接続すること、長時間処理のキャンセルと終了処理、配布ビルドの整備です。
+```powershell
+uv run --locked python scripts/build_portable.py --python-home C:/build/python --site-packages .venv/Lib/site-packages --destination C:/build/DiveE_Music_Studio_Portable
+```
+
+新しい出力フォルダを指定してください。Python と依存パッケージのライセンス、FFmpeg 配布物のライセンス・文書を保持します。配布元と検証値は [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) にあります。
+
+## ソースの構成
+
+- `main.py` と `src/gui/modules/{splitter,tab_studio,tools,settings}.py` が正規の画面です。
+- `src/audio/separator.py` は別プロセスで Demucs CLI を実行し、出力を検証します。
+- `src/core/runtime_assets.py` は同梱 FFmpeg とモデルを解決します。システムの PATH は変更しません。
+- `src/audio/transcriber.py`、Songsterr / Gmail / YouTube アップロード / TuxGuitar 関連は未接続の試作です。採譜の `basic_pitch` は現行依存関係に含まず、起動時にも読み込みません。
+- 重複していた `*_frame.py` は削除し、以前の実装は Git 履歴に残しています。
+- `DiveE_Source_Code.txt` は過去の書き出しで、現行ソースの正本ではありません。
+
+次の候補は採譜の接続、長時間処理のキャンセル、インストーラーの整備です。

@@ -18,27 +18,32 @@ class SeparationTests(unittest.TestCase):
         self.source = self.root / "日本語 input.wav"
         sf.write(self.source, np.zeros((4410, 2)), 44100)
         self.output = self.root / "outputs"
+        self.environment = patch("src.audio.separator.audio_environment", return_value={})
+        self.repository = patch("src.audio.separator.model_repository", return_value=self.root)
+        self.environment.start()
+        self.repository.start()
+        self.addCleanup(self.environment.stop)
+        self.addCleanup(self.repository.stop)
 
     def produce(self, command, **kwargs):
         self.assertEqual(command[1:3], ["-m", "demucs.separate"])
         self.assertEqual(command[-1], str(self.source.resolve()))
         self.assertEqual(command[command.index("--device") + 1], "cpu")
+        self.assertEqual(command[command.index("--repo") + 1], str(self.root))
         folder = Path(command[command.index("--out") + 1]) / "htdemucs" / self.source.stem
         folder.mkdir(parents=True)
         for stem in STEMS:
             sf.write(folder / f"{stem}.wav", np.zeros((4410, 2)), 44100)
         return subprocess.CompletedProcess(command, 0, "", "")
 
-    @patch("src.audio.separator.shutil.which", return_value="ffmpeg")
-    def test_four_readable_stems_and_unique_jobs(self, _):
+    def test_four_readable_stems_and_unique_jobs(self):
         with patch("src.audio.separator.subprocess.run", side_effect=self.produce):
             first = separate_audio(self.source, self.output, "htdemucs", False)
             second = separate_audio(self.source, self.output, "htdemucs", False)
         self.assertNotEqual(first, second)
         self.assertEqual(len(list(first.glob("*.wav"))), 4)
 
-    @patch("src.audio.separator.shutil.which", return_value="ffmpeg")
-    def test_incomplete_stems_are_not_success(self, _):
+    def test_incomplete_stems_are_not_success(self):
         def partial(command, **kwargs):
             result = self.produce(command, **kwargs)
             folder = Path(command[command.index("--out") + 1]) / "htdemucs" / self.source.stem
@@ -49,16 +54,14 @@ class SeparationTests(unittest.TestCase):
                 separate_audio(self.source, self.output, "htdemucs", False)
         self.assertEqual(list(self.output.iterdir()), [])
 
-    @patch("src.audio.separator.shutil.which", return_value="ffmpeg")
-    def test_process_failure(self, _):
+    def test_process_failure(self):
         with patch("src.audio.separator.subprocess.run", return_value=subprocess.CompletedProcess([], 1, "", "model error")):
             with self.assertRaisesRegex(RuntimeError, "model error"):
                 separate_audio(self.source, self.output)
         self.assertEqual(list(self.output.iterdir()), [])
 
-    @patch("src.audio.separator.shutil.which", return_value=None)
-    def test_missing_ffmpeg(self, _):
-        with self.assertRaisesRegex(RuntimeError, "FFmpeg"):
+    def test_missing_ffmpeg(self):
+        with patch("src.audio.separator.audio_environment", side_effect=RuntimeError("FFmpeg missing")), self.assertRaisesRegex(RuntimeError, "FFmpeg"):
             separate_audio(self.source, self.output)
 
     def test_missing_input(self):
@@ -71,7 +74,7 @@ class DownloadTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             AudioDownloader.download("https://youtube.com.example.org/video", "unused")
 
-    @patch("src.core.downloader.shutil.which", return_value="ffmpeg")
+    @patch("src.core.downloader.ffmpeg_paths", return_value=(Path("ffmpeg.exe"), Path("ffprobe.exe")))
     def test_requires_converted_file(self, _):
         with tempfile.TemporaryDirectory() as temp, patch("src.core.downloader.yt_dlp.YoutubeDL") as factory:
             client = factory.return_value.__enter__.return_value
@@ -80,3 +83,4 @@ class DownloadTests(unittest.TestCase):
                 AudioDownloader.download("https://youtu.be/test", temp)
             (Path(temp) / "test.mp3").write_bytes(b"audio")
             self.assertEqual(AudioDownloader.download("https://youtu.be/test", temp), str(Path(temp) / "test.mp3"))
+            self.assertEqual(factory.call_args.args[0]["ffmpeg_location"], ".")

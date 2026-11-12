@@ -17,7 +17,8 @@ class SettingsFrame(ctk.CTkFrame):
         SectionHeader(self.container, text="Application Settings").pack(pady=20, padx=30, anchor="w")
 
         # Paths
-        self._create_setting_row("Models Path", str(config.models_path))
+        self._create_setting_row("Bundled Models", str(config.base_path / "vendor" / "models"))
+        self._create_setting_row("Bundled FFmpeg", str(config.base_path / "vendor" / "ffmpeg" / "bin"))
         self._create_setting_row("Output Path", str(config.app_data_path / "outputs"))
         
         # Appearance

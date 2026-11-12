@@ -1,5 +1,5 @@
 import os
-import shutil
+from src.core.runtime_assets import ffmpeg_paths
 from urllib.parse import urlparse
 import yt_dlp
 from pathlib import Path
@@ -15,8 +15,7 @@ class AudioDownloader:
             "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"
         }:
             raise ValueError("Enter a valid YouTube URL.")
-        if not shutil.which("ffmpeg"):
-            raise RuntimeError("FFmpeg is required. Install it and add ffmpeg to PATH.")
+        ffmpeg, _ = ffmpeg_paths()
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -24,6 +23,7 @@ class AudioDownloader:
         ydl_opts = {
             'format': 'bestaudio/best',
             'noplaylist': True,
+            'ffmpeg_location': str(ffmpeg.parent),
             'outtmpl': os.path.join(output_dir, '%(title)s [%(id)s].%(ext)s'),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',

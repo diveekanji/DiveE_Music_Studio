@@ -5,8 +5,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from src.core.runtime_assets import audio_environment, model_repository
 
-MODELS = {"htdemucs", "htdemucs_ft", "mdx_extra"}
+MODELS = {"htdemucs"}
 STEMS = ("drums", "bass", "other", "vocals")
 
 
@@ -16,15 +17,15 @@ def separate_audio(source, output_root, model="htdemucs", use_gpu=True):
         raise FileNotFoundError(f"Audio file not found: {source}")
     if model not in MODELS:
         raise ValueError(f"Unsupported model: {model}")
-    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
-        raise RuntimeError("FFmpeg is required. Add ffmpeg and ffprobe to PATH.")
+    env = audio_environment()
+    repository = model_repository(model)
 
     output_root = Path(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
     # A fresh directory prevents stale/partial output from being reported as success.
     job_dir = Path(tempfile.mkdtemp(prefix="separation-", dir=output_root))
     command = [sys.executable, "-m", "demucs.separate", "-n", model,
-               "--out", str(job_dir), "--float32"]
+               "--repo", str(repository), "--out", str(job_dir), "--float32"]
     if not use_gpu:
         command += ["--device", "cpu"]
     # Demucs selects CUDA when available, otherwise CPU, if device is omitted.
@@ -33,6 +34,7 @@ def separate_audio(source, output_root, model="htdemucs", use_gpu=True):
         result = subprocess.run(
             command, capture_output=True, text=True, encoding="utf-8", errors="replace",
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            env=env,
         )
         if result.returncode:
             raise RuntimeError(f"Demucs failed ({result.returncode}):\n{result.stderr[-6000:]}")
