@@ -39,7 +39,7 @@ class SettingsFrame(ctk.CTkFrame):
         btn_frame.pack(fill="x", padx=30, pady=10)
         
         SecondaryButton(btn_frame, text="Open Data Folder", command=self._open_data_folder).pack(side="left", padx=(0, 10))
-        SecondaryButton(btn_frame, text="Clear Cache", command=None, fg_color=AppColors.ERROR, border_color=AppColors.ERROR, text_color="white").pack(side="left")
+        SecondaryButton(btn_frame, text="Clear Cache (Not implemented)", state="disabled", command=None, fg_color=AppColors.ERROR, border_color=AppColors.ERROR, text_color="white").pack(side="left")
 
         # Version Info
         ctk.CTkLabel(self.container, text="DiveE MUSIC STUDIO v1.0.0", font=AppFonts.caption(), text_color=AppColors.TEXT_SUB).pack(side="bottom", pady=20)

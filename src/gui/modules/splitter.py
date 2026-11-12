@@ -1,11 +1,10 @@
 # src/gui/modules/splitter.py
 
-import os
+import queue
 import threading
 import time
 from pathlib import Path
 import traceback
-import demucs.api
 
 import customtkinter as ctk
 from tkinter import filedialog, END
@@ -20,9 +19,7 @@ from src.gui.shared import (
 from src.core.config_manager import config
 
 # 実分離に使用
-from demucs.api import Separator
-from pydub import AudioSegment
-import torch
+from src.audio.separator import separate_audio
 
 
 class SplitterFrame(ctk.CTkFrame):
@@ -31,6 +28,7 @@ class SplitterFrame(ctk.CTkFrame):
         self.app_root = app_root
         self.selected_file_path: str | None = None
         self.is_processing = False
+        self.events = queue.Queue()
 
         # レイアウト
         self.columnconfigure(0, weight=4)
@@ -39,6 +37,7 @@ class SplitterFrame(ctk.CTkFrame):
 
         self._init_left_panel()
         self._init_right_panel()
+        self.after(100, self._poll_events)
 
     # ---------------- UI ----------------
 
@@ -86,10 +85,10 @@ class SplitterFrame(ctk.CTkFrame):
         # 設定
         SectionHeader(self.left_panel, text="Separation Settings").pack(pady=(10, 10), padx=20, anchor="w")
 
-        self.model_var = ctk.StringVar(value="mdx_extra_q (High Quality)")
+        self.model_var = ctk.StringVar(value="htdemucs (Standard)")
         self.model_combo = ctk.CTkOptionMenu(
             self.left_panel,
-            values=["htdemucs (Standard)", "htdemucs_ft (Fine-tuned)", "mdx_extra_q (High Quality)"],
+            values=["htdemucs (Standard)", "htdemucs_ft (Fine-tuned)", "mdx_extra (High Quality)"],
             variable=self.model_var,
             font=AppFonts.body(),
             fg_color=AppColors.BG_ROOT,
@@ -157,10 +156,11 @@ class SplitterFrame(ctk.CTkFrame):
     # ---------------- Logic ----------------
 
     def _on_drop(self, event):
-        file_path = event.data
-        if isinstance(file_path, str) and file_path.startswith('{') and file_path.endswith('}'):
-            file_path = file_path[1:-1]
-        self._set_file(file_path)
+        paths = self.tk.splitlist(event.data)
+        if len(paths) != 1:
+            self.log("Please drop one audio file at a time.")
+            return
+        self._set_file(paths[0])
 
     def _select_file_dialog(self):
         file_path = filedialog.askopenfilename(
@@ -170,128 +170,61 @@ class SplitterFrame(ctk.CTkFrame):
             self._set_file(file_path)
 
     def _set_file(self, path: str):
+        if self.is_processing:
+            return
         self.selected_file_path = path
         filename = Path(path).name
         self.file_label.configure(text=f"Selected: {filename}", text_color=AppColors.PRIMARY)
         self.drop_zone.configure(border_color=AppColors.PRIMARY)
         self.log(f"File loaded: {path}")
 
-    def log(self, message: str):
-        def _write():
-            timestamp = time.strftime("%H:%M:%S")
-            self.console.configure(state="normal")
-            self.console.insert(END, f"[{timestamp}] {message}\n")
-            self.console.see(END)
-            self.console.configure(state="disabled")
-        self.after(0, _write)
+    def log(self, message):
+        timestamp = time.strftime("%H:%M:%S")
+        self.console.configure(state="normal")
+        self.console.insert(END, f"[{timestamp}] {message}\n")
+        self.console.see(END)
+        self.console.configure(state="disabled")
 
     def _start_processing(self):
-        if not self.selected_file_path:
-            self.log("ERROR: Please select a file first.")
-            self.status_badge.update_status("ERROR", "error")
-            return
         if self.is_processing:
             return
-
+        if not self.selected_file_path or not Path(self.selected_file_path).is_file():
+            self.log("ERROR: Please select an existing audio file.")
+            self.status_badge.update_status("ERROR", "error")
+            return
+        # Read Tk variables on the UI thread, before starting the worker.
+        source = self.selected_file_path
+        model = self.model_var.get().split()[0]
+        use_gpu = bool(self.check_gpu.get())
         self.is_processing = True
         self.btn_run.configure(state="disabled", text="PROCESSING...")
         self.status_badge.update_status("RUNNING", "warning")
         self.progress_bar.configure(mode="indeterminate")
         self.progress_bar.start()
+        self.log("Separating audio. First use downloads model weights; CUDA falls back to CPU when unavailable.")
+        threading.Thread(target=self._run_demucs_task,
+                         args=(source, model, use_gpu), daemon=True).start()
 
-        threading.Thread(target=self._run_demucs_task, daemon=True).start()
-
-    # --------------- Actual separation ---------------
-
-    def _resolve_model_name(self, ui_name: str) -> str:
-        mapping = {
-            "htdemucs (Standard)": "htdemucs",
-            "htdemucs_ft (Fine-tuned)": "htdemucs_ft",
-            "mdx_extra_q (High Quality)": "mdx_extra_q",
-        }
-        return mapping.get(ui_name, "mdx_extra_q")
-
-    def _ensure_wav(self, src_path: Path) -> Path:
-        """
-        Demucs は多くの形式を扱えますが、FFmpeg の有無に依存します。
-        ここでは確実性のため WAV に変換してから渡します（pydub + ffmpeg）。
-        """
-        if src_path.suffix.lower() == ".wav":
-            return src_path
-
-        temp_dir = config.app_data_path / "temp"
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        dst = temp_dir / (src_path.stem + ".wav")
-
-        audio = AudioSegment.from_file(src_path)  # ffmpeg 必須
-        audio.export(dst, format="wav")
-        return dst
-
-    def _output_root(self) -> Path:
-        # すべて config_manager 経由（ルール厳守）
-        out_root = config.app_data_path / "outputs" / "splitter"
-        out_root.mkdir(parents=True, exist_ok=True)
-        return out_root
-
-    def _run_demucs_task(self):
-        """
-        実際に Demucs を叩いて分離し、出力フォルダへ保存する。
-        """
-        src = Path(self.selected_file_path)
-        model_ui = self.model_var.get()
-        model_name = self._resolve_model_name(model_ui)
-
+    def _run_demucs_task(self, source, model, use_gpu):
         try:
-            self.log(f"Starting separation using {model_name}...")
-            self.log("-> Loading Model...")
+            output = separate_audio(source, config.app_data_path / "outputs" / "splitter",
+                                    model=model, use_gpu=use_gpu)
+            self.events.put((True, f"Separation complete: {output}"))
+        except Exception:
+            self.events.put((False, traceback.format_exc()))
 
-            device = "cuda" if (self.check_gpu.get() and torch.cuda.is_available()) else "cpu"
-            if device == "cpu" and self.check_gpu.get():
-                self.log("!! CUDA not available. Falling back to CPU.")
-
-            separator = Separator(model=model_name, device=device)
-
-            self.log("-> Preparing Audio...")
-            wav_path = self._ensure_wav(src)
-
-            out_root = self._output_root()
-            track_dir = out_root / src.stem  # 1曲ごとにサブフォルダ
-            track_dir.mkdir(parents=True, exist_ok=True)
-
-            self.log("-> Separating (this can take a while)...")
-            # Demucs は destination にディレクトリを指定すると、{destination}/{filename}/ に書き出します
-            separator.separate_audio_file(
-                str(wav_path),
-                destination=str(out_root),
-                # ここでは4 stems (drums, bass, other, vocals) を標準出力
-                # API 側に two-stems の指定は無いので、必要な場合は post-mix で対応
-            )
-
-            # 出力確認
-            expected = [
-                track_dir / "drums.wav",
-                track_dir / "bass.wav",
-                track_dir / "other.wav",
-                track_dir / "vocals.wav",
-            ]
-            if not any(p.exists() for p in expected):
-                # Demucs の一部モデルはサブディレクトリ名が変わる可能性があるため念のため探索
-                maybe = list((out_root / src.stem).glob("*.wav"))
-                if not maybe:
-                    raise RuntimeError("No stems were written. Please check ffmpeg/torch install.")
-
-            self.log("-> Finalizing...")
-            self.status_badge.update_status("DONE", "success")
-            self.log(f"Separation Complete! Files saved to: {track_dir}")
-
-        except Exception as e:
-            self.status_badge.update_status("ERROR", "error")
-            self.log(f"ERROR: {e}")
-            self.log(traceback.format_exc())
-        finally:
-            # UI 復帰
-            self.after(0, lambda: self.btn_run.configure(state="normal", text="START SEPARATION"))
-            self.progress_bar.stop()
-            self.progress_bar.configure(mode="determinate")
-            self.progress_bar.set(1.0)
-            self.is_processing = False
+    def _poll_events(self):
+        try:
+            while True:
+                success, message = self.events.get_nowait()
+                self.log(message)
+                self.status_badge.update_status("DONE" if success else "ERROR",
+                                                "success" if success else "error")
+                self.progress_bar.stop()
+                self.progress_bar.configure(mode="determinate")
+                self.progress_bar.set(1 if success else 0)
+                self.btn_run.configure(state="normal", text="START SEPARATION")
+                self.is_processing = False
+        except queue.Empty:
+            pass
+        self.after(100, self._poll_events)

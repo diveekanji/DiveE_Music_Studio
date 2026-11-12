@@ -1,173 +1,126 @@
 import customtkinter as ctk
-from typing import Optional, Tuple, Union, Callable
-from src.core.config_manager import config
 
-# --- 1. Design Tokens (定数定義) ---
-
-class AppColors:
-    """モダンDAW風カラーパレット"""
-    # 背景色
-    BG_ROOT = "#121212"       # アプリ全体の背景
-    BG_CARD = "#1E1E1E"       # カード/パネル背景
-    BG_HOVER = "#2C2C2C"      # ホバー時の背景
-
-    # アクセントカラー
-    PRIMARY = "#3B8ED0"       # CustomTkinter標準ブルー
-    PRIMARY_HOVER = "#36719F"
-    SECONDARY = "#4A4A4A"     # サブボタン等
+# === 1. Color Palette (DiveE Theme) ===
+COLORS = {
+    "bg_dark": "#121212",         # アプリ背景
+    "card_bg": "#1E1E1E",         # カード・パネル背景
+    "card_border": "#2B2B2B",     # カード枠線
+    "card_hover": "#2A2A2A",      # ホバー背景
     
-    # 機能色
-    SUCCESS = "#00C853"       # 成功・完了
-    WARNING = "#FFAB00"       # 注意
-    ERROR = "#D50000"         # エラー
+    "accent": "#3B8ED0",          # メインアクション (青)
+    "accent_hover": "#36719F",
     
-    # テキスト
-    TEXT_MAIN = "#FFFFFF"     # メインテキスト
-    TEXT_SUB = "#B0B0B0"      # サブテキスト・ラベル
-    BORDER = "#333333"        # 境界線
+    "success": "#2CC985",         # 実行・完了 (緑)
+    "success_hover": "#26A66F",
+    
+    "danger": "#C0392B",          # 削除・ログアウト (赤)
+    "danger_hover": "#E74C3C",
+    
+    "text_main": "#FFFFFF",       # 本文
+    "text_sub": "#AAAAAA",        # サブテキスト
+    "input_bg": "#252525",        # 入力欄背景
+}
 
-class AppFonts:
-    """フォント設定"""
-    FONT_FILE = "NotoSansJP-Medium.ttf" 
-    FAMILY = "Roboto Medium" 
+# === 2. Typography ===
+FONTS = {
+    "h1": ("Roboto Medium", 24),
+    "h2": ("Roboto Medium", 20),
+    "h3": ("Arial", 14, "bold"),
+    "body": ("Arial", 12),
+    "small": ("Arial", 11),
+    "code": ("Consolas", 12),
+}
 
-    @classmethod
-    def load_custom_font(cls):
-        font_path = config.get_font_path(cls.FONT_FILE)
-        if font_path:
-            ctk.FontManager.load_font(font_path)
-
-    @classmethod
-    def header(cls): return (cls.FAMILY, 24, "bold")
-    @classmethod
-    def title(cls): return (cls.FAMILY, 18, "bold")
-    @classmethod
-    def body(cls): return (cls.FAMILY, 14)
-    @classmethod
-    def caption(cls): return (cls.FAMILY, 12)
-    @classmethod
-    def code(cls): return ("Consolas", 13)
-
-
-# --- 2. Custom Components (UI部品) ---
+# === 3. Atomic Components (共通部品) ===
 
 class ModernCard(ctk.CTkFrame):
-    def __init__(self, master, **kwargs):
-        # デフォルト値を設定しつつ、外部指定(kwargs)があればそれを優先
-        fg_color = kwargs.pop("fg_color", AppColors.BG_CARD)
-        border_color = kwargs.pop("border_color", AppColors.BORDER)
+    """枠線と角丸を持つ共通コンテナ"""
+    def __init__(self, parent, title=None, **kwargs):
+        # デフォルト値を設定（上書き可能）
+        kwargs.setdefault("fg_color", COLORS["card_bg"])
+        kwargs.setdefault("border_color", COLORS["card_border"])
+        kwargs.setdefault("border_width", 1)
+        kwargs.setdefault("corner_radius", 10)
         
-        super().__init__(
-            master, 
-            fg_color=fg_color,
-            corner_radius=12,
-            border_width=1,
-            border_color=border_color,
-            **kwargs
-        )
+        super().__init__(parent, **kwargs)
+        self.grid_columnconfigure(0, weight=1)
+        
+        self.inner_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.inner_frame.grid(row=1, column=0, sticky="nsew", padx=15, pady=15)
+        self.inner_frame.grid_columnconfigure(0, weight=1)
+
+        if title:
+            self.lbl_title = ctk.CTkLabel(self, text=title, font=FONTS["h3"], text_color=COLORS["text_sub"])
+            self.lbl_title.grid(row=0, column=0, sticky="w", padx=15, pady=(12, 0))
 
 class PrimaryButton(ctk.CTkButton):
-    def __init__(self, master, text: str, command: Callable = None, **kwargs):
-        # kwargsから取り出し（指定がなければデフォルト値を使用）
-        height = kwargs.pop("height", 36)
-        fg_color = kwargs.pop("fg_color", AppColors.PRIMARY)
-        hover_color = kwargs.pop("hover_color", AppColors.PRIMARY_HOVER)
-        text_color = kwargs.pop("text_color", AppColors.TEXT_MAIN)
+    """メインアクション用ボタン (青/緑)"""
+    def __init__(self, parent, text, command, color="accent", **kwargs):
+        fg = COLORS[color]
+        hover = COLORS[f"{color}_hover"]
         
-        super().__init__(
-            master,
-            text=text,
-            command=command,
-            font=AppFonts.body(),
-            fg_color=fg_color,
-            hover_color=hover_color,
-            text_color=text_color,
-            corner_radius=8,
-            height=height,
-            **kwargs
-        )
+        # デフォルト値を設定（kwargsに既に含まれている場合は上書きしない）
+        kwargs.setdefault("font", ("Roboto Medium", 13))
+        kwargs.setdefault("height", 36)
+        kwargs.setdefault("corner_radius", 6)
+        
+        super().__init__(parent, 
+                         text=text, 
+                         command=command,
+                         fg_color=fg, 
+                         hover_color=hover,
+                         **kwargs)
 
 class SecondaryButton(ctk.CTkButton):
-    def __init__(self, master, text: str, command: Callable = None, **kwargs):
-        height = kwargs.pop("height", 36)
-        fg_color = kwargs.pop("fg_color", "transparent")
-        border_color = kwargs.pop("border_color", AppColors.SECONDARY)
-        text_color = kwargs.pop("text_color", AppColors.TEXT_SUB)
-        hover_color = kwargs.pop("hover_color", AppColors.BG_HOVER)
-
-        super().__init__(
-            master,
-            text=text,
-            command=command,
-            font=AppFonts.body(),
-            fg_color=fg_color,
-            border_width=1,
-            border_color=border_color,
-            hover_color=hover_color,
-            text_color=text_color,
-            corner_radius=8,
-            height=height,
-            **kwargs
-        )
+    """サブアクション用ボタン (透明/枠線あり)"""
+    def __init__(self, parent, text, command, **kwargs):
+        # デフォルト値を設定
+        kwargs.setdefault("font", ("Arial", 12))
+        kwargs.setdefault("height", 36)
+        kwargs.setdefault("corner_radius", 6)
+        
+        super().__init__(parent, 
+                         text=text, 
+                         command=command,
+                         fg_color="transparent",
+                         border_width=1,
+                         border_color=COLORS["card_border"],
+                         text_color=COLORS["text_sub"],
+                         hover_color=COLORS["card_hover"],
+                         **kwargs)
 
 class ModernEntry(ctk.CTkEntry):
-    def __init__(self, master, placeholder_text: str = "", **kwargs):
-        height = kwargs.pop("height", 36)
-        fg_color = kwargs.pop("fg_color", AppColors.BG_ROOT)
-        text_color = kwargs.pop("text_color", AppColors.TEXT_MAIN)
-        placeholder_text_color = kwargs.pop("placeholder_text_color", AppColors.TEXT_SUB)
-        border_color = kwargs.pop("border_color", AppColors.BORDER)
-
-        super().__init__(
-            master,
-            placeholder_text=placeholder_text,
-            font=AppFonts.body(),
-            fg_color=fg_color,
-            border_color=border_color,
-            text_color=text_color,
-            placeholder_text_color=placeholder_text_color,
-            corner_radius=8,
-            height=height,
-            **kwargs
-        )
+    """共通スタイルの入力欄"""
+    def __init__(self, parent, placeholder="", **kwargs):
+        # デフォルト値を設定
+        kwargs.setdefault("height", 36)
+        kwargs.setdefault("corner_radius", 6)
+        
+        super().__init__(parent,
+                         placeholder_text=placeholder,
+                         fg_color=COLORS["input_bg"],
+                         border_width=1,
+                         border_color=COLORS["card_border"],
+                         text_color=COLORS["text_main"],
+                         **kwargs)
 
 class StatusBadge(ctk.CTkLabel):
-    def __init__(self, master, status: str = "IDLE", mode: str = "info", **kwargs):
+    """ステータス表示用バッジ"""
+    def __init__(self, parent, text, status="neutral", **kwargs):
         color_map = {
-            "success": AppColors.SUCCESS,
-            "warning": AppColors.WARNING,
-            "error": AppColors.ERROR,
-            "info": AppColors.SECONDARY
+            "success": COLORS["success"],
+            "error": COLORS["danger"],
+            "neutral": COLORS["text_sub"]
         }
-        bg_color = color_map.get(mode, AppColors.SECONDARY)
+        
+        super().__init__(parent, 
+                         text=f"● {text}", 
+                         text_color=color_map.get(status, "gray"),
+                         font=("Arial", 11, "bold"),
+                         **kwargs)
 
-        super().__init__(
-            master,
-            text=f" {status} ",
-            font=AppFonts.caption(),
-            fg_color=bg_color,
-            text_color="#FFFFFF",
-            corner_radius=6,
-            **kwargs
-        )
-    
-    def update_status(self, status: str, mode: str = "info"):
-        color_map = {
-            "success": AppColors.SUCCESS,
-            "warning": AppColors.WARNING,
-            "error": AppColors.ERROR,
-            "info": AppColors.SECONDARY
-        }
-        self.configure(text=f" {status} ", fg_color=color_map.get(mode, AppColors.SECONDARY))
-
-class SectionHeader(ctk.CTkLabel):
-    def __init__(self, master, text: str, **kwargs):
-        text_color = kwargs.pop("text_color", AppColors.TEXT_MAIN)
-        super().__init__(
-            master,
-            text=text,
-            font=AppFonts.title(),
-            text_color=text_color,
-            anchor="w",
-            **kwargs
-        )
+class DummyFile:
+    """Noconsole対策"""
+    def write(self, x): pass
+    def flush(self): pass
+    def isatty(self): return False

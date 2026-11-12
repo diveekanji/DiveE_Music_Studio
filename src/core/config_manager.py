@@ -1,41 +1,89 @@
+# src/core/config_manager.py
+import json
+import os
 import sys
 from pathlib import Path
 
+def get_app_base_path():
+    """実行環境（スクリプト/Exe）に応じたベースパスを取得"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        # main.py のあるディレクトリを基準にする
+        return os.path.dirname(os.path.abspath(sys.argv[0]))
+
 class ConfigManager:
-    _instance = None
+    CONFIG_FILE = "config.json"
+    
+    def __init__(self):
+        self.base_path = get_app_base_path()
+        self.config_path = os.path.join(self.base_path, self.CONFIG_FILE)
+        
+        # デフォルト設定（両プロジェクトのマージ）
+        self.DEFAULT_CONFIG = {
+            # --- Common ---
+            "theme": "Dark",
+            
+            # --- Audio Splitter Settings ---
+            "splitter_output_dir": os.path.join(self.base_path, "DiveE_Exports"),
+            "model": "htdemucs_6s",
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(ConfigManager, cls).__new__(cls)
-            cls._instance._init_paths()
-        return cls._instance
+            # --- Tab Studio Settings ---
+            "tux_path": r"C:\Program Files\tuxguitar\tuxguitar.exe",
+            "tab_output_dir": os.path.join(self.base_path, "Output"),
+            "headless_browser": False,
+            "keep_gp_file": True,
+            "open_folder": True,
+            "target_instruments": {
+                "bass": True,
+                "guitar": False,
+                "drum": False,
+                "others": False
+            }
+        }
+        self.config = self.DEFAULT_CONFIG.copy()
+        self.load()
 
-    def _init_paths(self):
-        """パスの初期化（PyInstallerと開発環境の両方に対応）"""
-        if getattr(sys, 'frozen', False):
-            # PyInstallerでビルドされた場合
-            self.base_path = Path(sys._MEIPASS)
-            self.app_data_path = Path.home() / "Documents" / "DiveE_Data"
-        else:
-            # 開発環境
-            self.base_path = Path(__file__).parent.parent.parent
-            self.app_data_path = self.base_path / "data"
+    def load(self):
+        """設定ファイルをロード"""
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    saved = json.load(f)
+                    self.config.update(saved)
+            except:
+                pass
+        
+        # フォルダ作成の保証
+        self._ensure_dirs()
 
-        # アセットパス
-        self.assets_path = self.base_path / "assets"
-        self.fonts_path = self.assets_path / "fonts"
-        self.models_path = self.app_data_path / "models"
+    def _ensure_dirs(self):
+        for key in ["splitter_output_dir", "tab_output_dir"]:
+            path = self.config.get(key)
+            if path:
+                try:
+                    os.makedirs(path, exist_ok=True)
+                except:
+                    pass
 
-        # 必要なディレクトリの作成
-        self.app_data_path.mkdir(parents=True, exist_ok=True)
-        self.models_path.mkdir(parents=True, exist_ok=True)
+    def save(self):
+        """現在のメモリ上の設定をファイルに書き込む"""
+        try:
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Config save error: {e}")
 
-    def get_font_path(self, font_name: str) -> str:
-        """フォントファイルのパスを取得"""
-        font_file = self.fonts_path / font_name
-        if font_file.exists():
-            return str(font_file)
-        return ""  # 見つからない場合は空文字を返す（CTKがデフォルトを使用）
+    # ▼▼▼ 追加: SettingsFrameから呼ばれるメソッド ▼▼▼
+    def save_config(self, new_config):
+        """辞書全体を受け取って更新・保存する"""
+        self.config = new_config
+        self.save()
+    # ▲▲▲ 追加終了 ▲▲▲
 
-# シングルトンインスタンス
-config = ConfigManager()
+    def get(self, key):
+        return self.config.get(key, self.DEFAULT_CONFIG.get(key))
+
+    def set(self, key, value):
+        self.config[key] = value
+        self.save()

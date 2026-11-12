@@ -3,7 +3,7 @@ name = "divee-music-studio"
 version = "1.0.0"
 description = "All-in-one music production automation studio."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     # GUI & Utilities
     "customtkinter>=5.2.2",
@@ -14,7 +14,7 @@ dependencies = [
     "watchdog>=6.0.0",
     "python-dotenv>=1.2.1",
     # Audio Engine (Splitter)
-    "demucs>=4.0.1",
+    "demucs==4.0.1",
     "librosa>=0.11.0",
     "soundfile>=0.13.1",
     "torch==2.3.1",
@@ -33,4 +33,4 @@ dependencies = [
     "tkinterdnd2>=0.4.3",
 ]
 
-# [tool.uv] セクションは削除してOK
+# Python 3.11 is the supported baseline for the pinned audio stack.
