@@ -1,4 +1,6 @@
 import os
+from src.core.runtime_assets import ffmpeg_paths
+from urllib.parse import urlparse
 import yt_dlp
 from pathlib import Path
 
@@ -8,6 +10,12 @@ class AudioDownloader:
         """
         YouTube URLから音声をダウンロードし、ファイルパスを返す。
         """
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or parsed.hostname not in {
+            "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"
+        }:
+            raise ValueError("Enter a valid YouTube URL.")
+        ffmpeg, _ = ffmpeg_paths()
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -15,7 +23,8 @@ class AudioDownloader:
         ydl_opts = {
             'format': 'bestaudio/best',
             'noplaylist': True,
-            'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
+            'ffmpeg_location': str(ffmpeg.parent),
+            'outtmpl': os.path.join(output_dir, '%(title)s [%(id)s].%(ext)s'),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -33,7 +42,7 @@ class AudioDownloader:
                     log_callback(f"Downloading: {p}")
             elif d['status'] == 'finished':
                 if log_callback:
-                    log_callback("Download Complete. Converting...")
+                    log_callback("Download received. Converting...")
 
         ydl_opts['progress_hooks'] = [progress_hook]
 
@@ -44,6 +53,8 @@ class AudioDownloader:
                 filename = ydl.prepare_filename(info)
                 # 拡張子がmp3に変わるため修正
                 final_path = os.path.splitext(filename)[0] + ".mp3"
+                if not Path(final_path).is_file() or Path(final_path).stat().st_size == 0:
+                    raise RuntimeError("Conversion did not produce an MP3 file.")
                 return final_path
         except Exception as e:
             raise e
